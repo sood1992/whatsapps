@@ -1,0 +1,582 @@
+// TreatForTails WhatsApp Automation - Database Schema
+// PostgreSQL with Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// User Management
+// ===========================================
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      AdminRole @default(ADMIN)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns Campaign[]
+  templates MessageTemplate[]
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+}
+
+// ===========================================
+// Customer Management
+// ===========================================
+
+model Customer {
+  id              String   @id @default(cuid())
+  phone           String   @unique // WhatsApp phone number with country code
+  name            String?
+  email           String?
+
+  // WooCommerce sync
+  wooCustomerId   Int?     @unique
+
+  // Consent & Preferences
+  optedIn         Boolean  @default(false)
+  optInDate       DateTime?
+  optOutDate      DateTime?
+  optInSource     String?  // website, checkout, manual, etc.
+
+  // Segmentation
+  tags            String[] @default([])
+  totalOrders     Int      @default(0)
+  totalSpent      Float    @default(0)
+  lastOrderDate   DateTime?
+  customerSince   DateTime?
+
+  // Pet Information (for personalization)
+  petName         String?
+  petType         String?  // dog, cat, etc.
+
+  // Engagement tracking
+  lastMessageSent DateTime?
+  lastMessageRead DateTime?
+  lastInteraction DateTime?
+  messageCount    Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  orders          Order[]
+  carts           AbandonedCart[]
+  messages        Message[]
+  campaignRecipients CampaignRecipient[]
+
+  @@index([phone])
+  @@index([wooCustomerId])
+  @@index([optedIn])
+  @@index([tags])
+}
+
+// ===========================================
+// Order Management (WooCommerce Sync)
+// ===========================================
+
+model Order {
+  id              String      @id @default(cuid())
+  wooOrderId      Int         @unique
+  orderNumber     String
+  status          OrderStatus
+  total           Float
+  currency        String      @default("INR")
+
+  // Customer
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+
+  // Order details
+  items           Json        // Array of order items
+  shippingAddress Json?
+  billingAddress  Json?
+
+  // Tracking
+  trackingNumber  String?
+  trackingUrl     String?
+
+  // Timestamps from WooCommerce
+  orderDate       DateTime
+  completedDate   DateTime?
+
+  // Message tracking
+  confirmationSent    Boolean @default(false)
+  shippingSent        Boolean @default(false)
+  deliverySent        Boolean @default(false)
+  reviewRequestSent   Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages        Message[]
+
+  @@index([wooOrderId])
+  @@index([customerId])
+  @@index([status])
+  @@index([orderDate])
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  FAILED
+  SHIPPED
+  DELIVERED
+}
+
+// ===========================================
+// Abandoned Cart Recovery
+// ===========================================
+
+model AbandonedCart {
+  id              String   @id @default(cuid())
+
+  // Customer
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  // Cart details
+  cartToken       String?  @unique
+  items           Json     // Array of cart items
+  subtotal        Float
+  currency        String   @default("INR")
+
+  // Recovery tracking
+  recoveryStatus  CartRecoveryStatus @default(ABANDONED)
+  recoveryAttempts Int     @default(0)
+  lastAttemptAt   DateTime?
+  recoveredAt     DateTime?
+  recoveredOrderId String?
+
+  // Timestamps
+  abandonedAt     DateTime @default(now())
+  expiresAt       DateTime
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages        Message[]
+
+  @@index([customerId])
+  @@index([recoveryStatus])
+  @@index([abandonedAt])
+}
+
+enum CartRecoveryStatus {
+  ABANDONED
+  REMINDER_SENT
+  FOLLOWUP_SENT
+  RECOVERED
+  EXPIRED
+  OPTED_OUT
+}
+
+// ===========================================
+// Message Templates (WhatsApp Approved)
+// ===========================================
+
+model MessageTemplate {
+  id              String   @id @default(cuid())
+
+  // Template identification
+  name            String   @unique
+  whatsappTemplateId String? // ID from Meta
+
+  // Template content
+  category        TemplateCategory
+  language        String   @default("en")
+
+  // Components
+  headerType      HeaderType?
+  headerContent   String?  // Text, image URL, document URL, or video URL
+  bodyText        String   // Main message with {{variables}}
+  footerText      String?
+
+  // Buttons
+  buttons         Json?    // Array of button objects
+
+  // Variables
+  variables       String[] @default([]) // List of variable names
+  sampleValues    Json?    // Sample values for approval
+
+  // Status
+  status          TemplateStatus @default(DRAFT)
+  rejectionReason String?
+
+  // Metadata
+  createdById     String
+  createdBy       Admin    @relation(fields: [createdById], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  campaigns       Campaign[]
+  messages        Message[]
+
+  @@index([category])
+  @@index([status])
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum HeaderType {
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum TemplateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ===========================================
+// Campaigns (Broadcasts)
+// ===========================================
+
+model Campaign {
+  id              String   @id @default(cuid())
+
+  // Campaign details
+  name            String
+  description     String?
+  type            CampaignType
+
+  // Template
+  templateId      String
+  template        MessageTemplate @relation(fields: [templateId], references: [id])
+  templateVariables Json?  // Variable mappings
+
+  // Targeting
+  targetAudience  Json     // Filter criteria
+  estimatedReach  Int      @default(0)
+
+  // Scheduling
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  // Recurrence (for daily/weekly offers)
+  isRecurring     Boolean  @default(false)
+  recurrenceRule  String?  // Cron expression
+  nextRunAt       DateTime?
+
+  // Stats
+  totalRecipients Int      @default(0)
+  sent            Int      @default(0)
+  delivered       Int      @default(0)
+  read            Int      @default(0)
+  clicked         Int      @default(0)
+  replied         Int      @default(0)
+  failed          Int      @default(0)
+  optedOut        Int      @default(0)
+
+  // Metadata
+  createdById     String
+  createdBy       Admin    @relation(fields: [createdById], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  recipients      CampaignRecipient[]
+  messages        Message[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([type])
+}
+
+enum CampaignType {
+  BROADCAST       // One-time broadcast
+  DAILY_OFFER     // Daily recurring
+  WEEKLY_OFFER    // Weekly recurring
+  ABANDONED_CART  // Automated cart recovery
+  ORDER_UPDATE    // Transactional
+  WELCOME         // Welcome message
+  REVIEW_REQUEST  // Post-purchase review
+  REENGAGEMENT    // Win-back campaigns
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model CampaignRecipient {
+  id              String   @id @default(cuid())
+
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id])
+
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  // Status tracking
+  status          RecipientStatus @default(PENDING)
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  clickedAt       DateTime?
+  repliedAt       DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+
+  // WhatsApp message ID
+  whatsappMessageId String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([status])
+}
+
+enum RecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  CLICKED
+  REPLIED
+  FAILED
+  OPTED_OUT
+}
+
+// ===========================================
+// Message Log
+// ===========================================
+
+model Message {
+  id              String   @id @default(cuid())
+
+  // WhatsApp identifiers
+  whatsappMessageId String? @unique
+
+  // Direction
+  direction       MessageDirection
+
+  // Customer
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  // Content
+  type            MessageType
+  content         Json     // Message content/payload
+
+  // Template (if applicable)
+  templateId      String?
+  template        MessageTemplate? @relation(fields: [templateId], references: [id])
+
+  // Related entities
+  campaignId      String?
+  campaign        Campaign? @relation(fields: [campaignId], references: [id])
+
+  orderId         String?
+  order           Order?   @relation(fields: [orderId], references: [id])
+
+  cartId          String?
+  cart            AbandonedCart? @relation(fields: [cartId], references: [id])
+
+  // Status tracking
+  status          MessageStatus @default(PENDING)
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+
+  // Costs
+  conversationType String?  // business_initiated, user_initiated
+  cost            Float?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([whatsappMessageId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  TEMPLATE
+  IMAGE
+  VIDEO
+  DOCUMENT
+  AUDIO
+  STICKER
+  LOCATION
+  CONTACT
+  INTERACTIVE
+  REACTION
+}
+
+enum MessageStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ===========================================
+// Automation Rules
+// ===========================================
+
+model AutomationRule {
+  id              String   @id @default(cuid())
+
+  name            String
+  description     String?
+
+  // Trigger
+  trigger         AutomationTrigger
+  triggerConfig   Json     // Trigger-specific configuration
+
+  // Action
+  action          AutomationAction
+  actionConfig    Json     // Action-specific configuration (template, delay, etc.)
+
+  // Status
+  isActive        Boolean  @default(true)
+
+  // Stats
+  timesTriggered  Int      @default(0)
+  lastTriggeredAt DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([trigger])
+  @@index([isActive])
+}
+
+enum AutomationTrigger {
+  ORDER_CREATED
+  ORDER_COMPLETED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  CART_ABANDONED
+  CUSTOMER_OPTED_IN
+  CUSTOMER_BIRTHDAY
+  NO_ORDER_DAYS      // Re-engagement
+  KEYWORD_RECEIVED   // Auto-reply
+}
+
+enum AutomationAction {
+  SEND_TEMPLATE
+  SEND_MESSAGE
+  ADD_TAG
+  REMOVE_TAG
+  UPDATE_CUSTOMER
+  NOTIFY_ADMIN
+}
+
+// ===========================================
+// Analytics & Reporting
+// ===========================================
+
+model DailyStats {
+  id              String   @id @default(cuid())
+  date            DateTime @unique
+
+  // Messages
+  messagesSent    Int      @default(0)
+  messagesDelivered Int    @default(0)
+  messagesRead    Int      @default(0)
+  messagesFailed  Int      @default(0)
+
+  // Engagement
+  repliesReceived Int      @default(0)
+  linksClicked    Int      @default(0)
+
+  // Opt-ins/outs
+  newOptIns       Int      @default(0)
+  optOuts         Int      @default(0)
+
+  // Carts
+  cartsAbandoned  Int      @default(0)
+  cartsRecovered  Int      @default(0)
+  recoveryRevenue Float    @default(0)
+
+  // Costs
+  totalCost       Float    @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ===========================================
+// System Settings
+// ===========================================
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===========================================
+// Webhook Logs (for debugging)
+// ===========================================
+
+model WebhookLog {
+  id        String   @id @default(cuid())
+  source    String   // whatsapp, woocommerce
+  event     String
+  payload   Json
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([source])
+  @@index([createdAt])
+}
