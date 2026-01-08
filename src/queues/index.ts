@@ -9,7 +9,6 @@
  */
 
 import { Queue, Worker, QueueEvents } from 'bullmq';
-import { redis } from '../config/redis';
 import { logger } from '../utils/logger';
 import { config } from '../config/environment';
 
@@ -17,6 +16,22 @@ import { config } from '../config/environment';
 import { messageQueueProcessor } from './message.queue';
 import { cartRecoveryQueueProcessor } from './cart-recovery.queue';
 import { orderNotificationQueueProcessor } from './order-notification.queue';
+
+// Parse Redis URL for BullMQ connection
+function getRedisConnection() {
+  try {
+    const url = new URL(config.redisUrl);
+    return {
+      host: url.hostname || 'localhost',
+      port: parseInt(url.port || '6379'),
+      password: url.password || undefined,
+    };
+  } catch {
+    return { host: 'localhost', port: 6379 };
+  }
+}
+
+const redisConnection = getRedisConnection();
 
 // Queue names
 export const QUEUE_NAMES = {
@@ -29,7 +44,7 @@ export const QUEUE_NAMES = {
 
 // Queue instances
 export const messageQueue = new Queue(QUEUE_NAMES.MESSAGES, {
-  connection: redis,
+  connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -42,7 +57,7 @@ export const messageQueue = new Queue(QUEUE_NAMES.MESSAGES, {
 });
 
 export const cartRecoveryQueue = new Queue(QUEUE_NAMES.CART_RECOVERY, {
-  connection: redis,
+  connection: redisConnection,
   defaultJobOptions: {
     attempts: 2,
     backoff: {
@@ -55,7 +70,7 @@ export const cartRecoveryQueue = new Queue(QUEUE_NAMES.CART_RECOVERY, {
 });
 
 export const orderNotificationQueue = new Queue(QUEUE_NAMES.ORDER_NOTIFICATIONS, {
-  connection: redis,
+  connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -68,7 +83,7 @@ export const orderNotificationQueue = new Queue(QUEUE_NAMES.ORDER_NOTIFICATIONS,
 });
 
 export const campaignQueue = new Queue(QUEUE_NAMES.CAMPAIGNS, {
-  connection: redis,
+  connection: redisConnection,
   defaultJobOptions: {
     attempts: 1,
     removeOnComplete: 50,
@@ -90,7 +105,7 @@ export async function initializeQueues(): Promise<void> {
     QUEUE_NAMES.MESSAGES,
     messageQueueProcessor,
     {
-      connection: redis,
+      connection: redisConnection,
       concurrency: 5,
       limiter: {
         max: config.messaging.maxMessagesPerMinute,
@@ -103,7 +118,7 @@ export async function initializeQueues(): Promise<void> {
     QUEUE_NAMES.CART_RECOVERY,
     cartRecoveryQueueProcessor,
     {
-      connection: redis,
+      connection: redisConnection,
       concurrency: 3,
     }
   );
@@ -112,7 +127,7 @@ export async function initializeQueues(): Promise<void> {
     QUEUE_NAMES.ORDER_NOTIFICATIONS,
     orderNotificationQueueProcessor,
     {
-      connection: redis,
+      connection: redisConnection,
       concurrency: 5,
     }
   );
@@ -142,7 +157,7 @@ export async function initializeQueues(): Promise<void> {
 
   // Queue events for monitoring
   const messageQueueEvents = new QueueEvents(QUEUE_NAMES.MESSAGES, {
-    connection: redis,
+    connection: redisConnection,
   });
 
   messageQueueEvents.on('waiting', ({ jobId }) => {

@@ -9,13 +9,27 @@
  */
 
 import { Job, Queue } from 'bullmq';
-import { redis } from '../config/redis';
+import { config } from '../config/environment';
 import { logger } from '../utils/logger';
 import { whatsappService } from '../services/whatsapp.service';
 import { prisma } from '../config/database';
 
+// Parse Redis URL for BullMQ connection
+function getRedisConnection() {
+  try {
+    const url = new URL(config.redisUrl);
+    return {
+      host: url.hostname || 'localhost',
+      port: parseInt(url.port || '6379'),
+      password: url.password || undefined,
+    };
+  } catch {
+    return { host: 'localhost', port: 6379 };
+  }
+}
+
 export const orderNotificationQueue = new Queue('order-notifications', {
-  connection: redis,
+  connection: getRedisConnection(),
 });
 
 interface OrderNotificationJob {

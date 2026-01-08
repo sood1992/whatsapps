@@ -9,12 +9,26 @@
  */
 
 import { Job, Queue } from 'bullmq';
-import { redis } from '../config/redis';
+import { config } from '../config/environment';
 import { logger } from '../utils/logger';
 import { abandonedCartService } from '../services/abandoned-cart.service';
 
+// Parse Redis URL for BullMQ connection
+function getRedisConnection() {
+  try {
+    const url = new URL(config.redisUrl);
+    return {
+      host: url.hostname || 'localhost',
+      port: parseInt(url.port || '6379'),
+      password: url.password || undefined,
+    };
+  } catch {
+    return { host: 'localhost', port: 6379 };
+  }
+}
+
 export const cartRecoveryQueue = new Queue('cart-recovery', {
-  connection: redis,
+  connection: getRedisConnection(),
 });
 
 interface CartRecoveryJob {
