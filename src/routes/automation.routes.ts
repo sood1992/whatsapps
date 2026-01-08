@@ -8,7 +8,7 @@ import { prisma } from '../config/database';
 import { logger } from '../utils/logger';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { automationService } from '../services/automation.service';
-import { AutomationTrigger, AutomationAction } from '@prisma/client';
+import { AutomationTrigger, AutomationAction, Prisma } from '@prisma/client';
 
 const router = Router();
 router.use(authMiddleware);
@@ -71,9 +71,9 @@ router.post('/', async (req: Request, res: Response) => {
         name: data.name,
         description: data.description,
         trigger: data.trigger,
-        triggerConfig: data.triggerConfig || {},
+        triggerConfig: (data.triggerConfig || {}) as Prisma.InputJsonValue,
         action: data.action,
-        actionConfig: data.actionConfig,
+        actionConfig: data.actionConfig as Prisma.InputJsonValue,
         isActive: data.isActive,
       },
     });

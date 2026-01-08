@@ -139,8 +139,8 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
 
     // Build components for Meta API
     const components: Array<{
-      type: string;
-      format?: string;
+      type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
+      format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
       text?: string;
       example?: { header_text?: string[]; body_text?: string[][] };
       buttons?: Array<{
@@ -155,7 +155,7 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
     if (template.headerType) {
       components.push({
         type: 'HEADER',
-        format: template.headerType,
+        format: template.headerType as 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT',
         text: template.headerType === 'TEXT' ? template.headerContent || undefined : undefined,
       });
     }

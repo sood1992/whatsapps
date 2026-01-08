@@ -21,7 +21,7 @@ import {
   scheduleDeliveryNotification,
   scheduleReviewRequest,
 } from '../queues/order-notification.queue';
-import { AutomationTrigger, MessageDirection, MessageType, MessageStatus } from '@prisma/client';
+import { AutomationTrigger, MessageDirection, MessageType, MessageStatus, Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -185,7 +185,7 @@ async function handleIncomingMessage(
 
   // Log incoming message
   let messageContent: Record<string, unknown> = {};
-  let messageType = MessageType.TEXT;
+  let messageType: MessageType = MessageType.TEXT;
 
   if (message.type === 'text' && message.text) {
     messageContent = { text: message.text.body };
@@ -205,7 +205,7 @@ async function handleIncomingMessage(
       direction: MessageDirection.INBOUND,
       customerId: customer.id,
       type: messageType,
-      content: messageContent,
+      content: messageContent as Prisma.InputJsonValue,
       status: MessageStatus.DELIVERED,
       deliveredAt: new Date(parseInt(message.timestamp) * 1000),
     },

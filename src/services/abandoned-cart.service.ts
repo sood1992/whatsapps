@@ -22,7 +22,7 @@ import { logger } from '../utils/logger';
 import { whatsappService } from './whatsapp.service';
 import { wooCommerceService } from './woocommerce.service';
 import { cartRecoveryQueue } from '../queues/cart-recovery.queue';
-import { CartRecoveryStatus } from '@prisma/client';
+import { CartRecoveryStatus, Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 
 interface CartItem {
@@ -114,7 +114,7 @@ export class AbandonedCartService {
       cart = await prisma.abandonedCart.update({
         where: { id: existingCart.id },
         data: {
-          items: items as unknown as Record<string, unknown>[],
+          items: items as Prisma.InputJsonValue,
           subtotal,
           abandonedAt: new Date(),
           expiresAt,
@@ -125,7 +125,7 @@ export class AbandonedCartService {
         data: {
           customerId,
           cartToken: cartToken || `cart_${nanoid(12)}`,
-          items: items as unknown as Record<string, unknown>[],
+          items: items as Prisma.InputJsonValue,
           subtotal,
           currency: 'INR',
           recoveryStatus: CartRecoveryStatus.ABANDONED,
@@ -311,13 +311,13 @@ export class AbandonedCartService {
     productImage?: string
   ): Array<{
     type: 'header' | 'body' | 'button';
-    parameters?: Array<{ type: string; text?: string; image?: { link: string } }>;
+    parameters?: Array<{ type: 'text' | 'image'; text?: string; image?: { link: string } }>;
     sub_type?: string;
     index?: number;
   }> {
     const components: Array<{
       type: 'header' | 'body' | 'button';
-      parameters?: Array<{ type: string; text?: string; image?: { link: string } }>;
+      parameters?: Array<{ type: 'text' | 'image'; text?: string; image?: { link: string } }>;
       sub_type?: string;
       index?: number;
     }> = [];

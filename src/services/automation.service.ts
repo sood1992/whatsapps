@@ -270,7 +270,7 @@ export class AutomationService {
 
     const variables: Record<string, string> = {};
     for (const [key, contextKey] of Object.entries(mapping)) {
-      variables[key] = (context as Record<string, unknown>)[contextKey]?.toString() || '';
+      variables[key] = ((context as unknown) as Record<string, unknown>)[contextKey]?.toString() || '';
     }
     return variables;
   }
@@ -363,7 +363,7 @@ export class AutomationService {
 
     for (const rule of defaultRules) {
       await prisma.automationRule.upsert({
-        where: { name: rule.name } as { name: string },
+        where: { name: rule.name },
         create: {
           name: rule.name,
           description: rule.description,

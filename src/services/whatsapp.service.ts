@@ -15,7 +15,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { config } from '../config/environment';
 import { logger } from '../utils/logger';
 import { prisma } from '../config/database';
-import { MessageStatus, MessageType, MessageDirection } from '@prisma/client';
+import { MessageStatus, MessageType, MessageDirection, Prisma } from '@prisma/client';
 
 // Types for WhatsApp Cloud API
 interface WhatsAppTextMessage {
@@ -619,7 +619,7 @@ export class WhatsAppService {
           cartId: data.cartId,
           templateId: data.templateId,
           type: data.type,
-          content: data.content,
+          content: data.content as Prisma.InputJsonValue,
           status: data.status,
           sentAt: new Date(),
         },

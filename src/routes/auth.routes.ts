@@ -46,7 +46,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: admin.id, email: admin.email, role: admin.role },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
     );
 
     logger.info({ adminId: admin.id }, 'Admin logged in');
@@ -117,7 +117,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: admin.id, email: admin.email, role: admin.role },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
     );
 
     logger.info({ adminId: admin.id }, 'Admin registered');
