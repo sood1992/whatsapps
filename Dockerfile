@@ -42,14 +42,14 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 treatfortails
 
-# Copy built assets
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
+# Copy built assets with proper ownership
+COPY --from=builder --chown=treatfortails:nodejs /app/dist ./dist
+COPY --from=builder --chown=treatfortails:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=treatfortails:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=treatfortails:nodejs /app/prisma ./prisma
 
 # Copy dashboard build
-COPY --from=builder /app/dist/dashboard ./dist/dashboard
+COPY --from=builder --chown=treatfortails:nodejs /app/dist/dashboard ./dist/dashboard
 
 USER treatfortails
 
