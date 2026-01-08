@@ -8,8 +8,8 @@ FROM base AS deps
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
-COPY dashboard/package.json ./dashboard/
+COPY package.json package-lock.json ./
+COPY dashboard/package.json dashboard/package-lock.json ./dashboard/
 
 # Install dependencies
 RUN npm ci
