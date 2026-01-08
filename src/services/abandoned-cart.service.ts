@@ -114,7 +114,7 @@ export class AbandonedCartService {
       cart = await prisma.abandonedCart.update({
         where: { id: existingCart.id },
         data: {
-          items: items as Prisma.InputJsonValue,
+          items: items as unknown as Prisma.InputJsonValue,
           subtotal,
           abandonedAt: new Date(),
           expiresAt,
@@ -125,7 +125,7 @@ export class AbandonedCartService {
         data: {
           customerId,
           cartToken: cartToken || `cart_${nanoid(12)}`,
-          items: items as Prisma.InputJsonValue,
+          items: items as unknown as Prisma.InputJsonValue,
           subtotal,
           currency: 'INR',
           recoveryStatus: CartRecoveryStatus.ABANDONED,
@@ -312,13 +312,13 @@ export class AbandonedCartService {
   ): Array<{
     type: 'header' | 'body' | 'button';
     parameters?: Array<{ type: 'text' | 'image'; text?: string; image?: { link: string } }>;
-    sub_type?: string;
+    sub_type?: 'quick_reply' | 'url';
     index?: number;
   }> {
     const components: Array<{
       type: 'header' | 'body' | 'button';
       parameters?: Array<{ type: 'text' | 'image'; text?: string; image?: { link: string } }>;
-      sub_type?: string;
+      sub_type?: 'quick_reply' | 'url';
       index?: number;
     }> = [];
 

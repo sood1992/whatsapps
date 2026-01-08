@@ -188,7 +188,7 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
       components.push({
         type: 'BUTTONS',
         buttons: buttons.map((btn) => ({
-          type: btn.type,
+          type: btn.type as 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER',
           text: btn.text,
           url: btn.url,
           phone_number: btn.phone_number,
