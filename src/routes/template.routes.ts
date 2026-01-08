@@ -144,7 +144,7 @@ router.post('/:id/submit', async (req: Request, res: Response) => {
       text?: string;
       example?: { header_text?: string[]; body_text?: string[][] };
       buttons?: Array<{
-        type: string;
+        type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
         text: string;
         url?: string;
         phone_number?: string;
